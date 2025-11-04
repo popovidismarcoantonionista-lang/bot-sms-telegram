@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: bot-sms-telegram
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot_sms_telegram.py
+    envVars:
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: SMS_ACTIVATE_API_KEY
+        sync: false
+      - key: PLUGGY_CLIENT_ID
+        sync: false
+      - key: PLUGGY_CLIENT_SECRET
+        sync: false
