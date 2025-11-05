@@ -114,7 +114,7 @@ def ajuda(msg):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('d_'))
 def proc_dep(call):
     v = call.data.split("_")[1]
-    bot.edit_message_text(f"✅ R$ {v}\n\n📱 PIX: `seu-pix@email.com`\n\nEnvie comprovante", 
+    bot.edit_message_text(f"✅ R$ {v}\n\n📱 PIX: `marconista2301@gmail.com`\n\nEnvie comprovante", 
                          call.message.chat.id, call.message.id, parse_mode="Markdown")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('c_'))
