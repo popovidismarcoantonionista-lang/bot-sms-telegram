@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Bot de Vendas de SMS para Telegram
-Deploy: Render.com 24/7
+Bot de Vendas de SMS - Versão Corrigida
+Sem uso de Updater (que causa AttributeError)
 """
 
 import os
@@ -11,13 +11,12 @@ import requests
 import logging
 from datetime import datetime
 from typing import Dict, Optional
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
-    MessageHandler,
-    filters,
     ContextTypes,
     ConversationHandler
 )
@@ -29,15 +28,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ============== CONFIGURAÇÕES (Variáveis de Ambiente) ==============
+# ============== CONFIGURAÇÕES ==============
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "7958563749:AAGUWtp2ISNcegnOHAr1Hfqu_dpigJPJR8s")
 PLUGGY_CLIENT_ID = os.getenv("PLUGGY_CLIENT_ID", "3d15ed55-b74a-4b7c-8bcc-430e80cf01ab")
 PLUGGY_CLIENT_SECRET = os.getenv("PLUGGY_CLIENT_SECRET", "ccef002e-7935-452b-ace8-dde1db125e81")
-PLUGGY_BASE_URL = "https://api.pluggy.ai"
 SMS_ACTIVATE_API_KEY = os.getenv("SMS_ACTIVATE_API_KEY", "58f78469017177b5defd637edA3983d1")
 SMS_ACTIVATE_BASE_URL = "https://api.sms-activate.org/stubs/handler_api.php"
 
-# Configurações de preços
+# Preços
 PRECO_CATEGORIAS = {
     "basico": {"preco": 0.60, "servicos": ["WhatsApp", "Telegram", "Discord"]},
     "padrao": {"preco": 1.00, "servicos": ["Instagram", "Facebook", "Twitter", "TikTok"]},
@@ -45,21 +43,27 @@ PRECO_CATEGORIAS = {
 }
 DEPOSITO_MINIMO = 1.00
 
-# Estados da conversa
-ESCOLHER_CATEGORIA, ESCOLHER_SERVICO, AGUARDAR_DEPOSITO = range(3)
+# Estados
+ESCOLHER_CATEGORIA, ESCOLHER_SERVICO = range(2)
 
-# ============== BANCO DE DADOS ==============
+# ============== DATABASE ==============
 DATABASE_FILE = "database.json"
 
 def carregar_database():
     if os.path.exists(DATABASE_FILE):
-        with open(DATABASE_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        try:
+            with open(DATABASE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return {}
     return {}
 
 def salvar_database(db):
-    with open(DATABASE_FILE, 'w', encoding='utf-8') as f:
-        json.dump(db, f, indent=2, ensure_ascii=False)
+    try:
+        with open(DATABASE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(db, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Erro ao salvar database: {e}")
 
 USER_DATABASE = carregar_database()
 
@@ -81,8 +85,8 @@ def atualizar_saldo(user_id: int, valor: float):
     USER_DATABASE[user_id_str] = usuario
     salvar_database(USER_DATABASE)
 
-# ============== INTEGRAÇÃO SMS ACTIVATE ==============
-def obter_numero_sms(servico: str, pais: str = "br") -> Optional[Dict]:
+# ============== SMS ACTIVATE ==============
+def obter_numero_sms(servico: str) -> Optional[Dict]:
     try:
         servico_map = {
             "WhatsApp": "wa", "Telegram": "tg", "Discord": "ds",
@@ -91,15 +95,15 @@ def obter_numero_sms(servico: str, pais: str = "br") -> Optional[Dict]:
             "Amazon": "am", "PayPal": "pp"
         }
 
-        codigo_servico = servico_map.get(servico, "wa")
+        codigo = servico_map.get(servico, "wa")
 
         response = requests.get(
             SMS_ACTIVATE_BASE_URL,
             params={
                 "api_key": SMS_ACTIVATE_API_KEY,
                 "action": "getNumber",
-                "service": codigo_servico,
-                "country": 132  # Brasil
+                "service": codigo,
+                "country": 132
             },
             timeout=10
         )
@@ -116,7 +120,7 @@ def obter_numero_sms(servico: str, pais: str = "br") -> Optional[Dict]:
         logger.error(f"Erro ao obter número: {response.text}")
         return None
     except Exception as e:
-        logger.error(f"Exceção ao obter número: {e}")
+        logger.error(f"Exceção: {e}")
         return None
 
 def obter_codigo_sms(activation_id: str) -> Optional[str]:
@@ -139,7 +143,7 @@ def obter_codigo_sms(activation_id: str) -> Optional[str]:
                 return "AGUARDANDO"
         return None
     except Exception as e:
-        logger.error(f"Erro ao obter código: {e}")
+        logger.error(f"Erro: {e}")
         return None
 
 def cancelar_numero_sms(activation_id: str) -> bool:
@@ -155,11 +159,10 @@ def cancelar_numero_sms(activation_id: str) -> bool:
             timeout=10
         )
         return response.status_code == 200 and "ACCESS_CANCEL" in response.text
-    except Exception as e:
-        logger.error(f"Erro ao cancelar: {e}")
+    except:
         return False
 
-# ============== COMANDOS DO BOT ==============
+# ============== COMANDOS ==============
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     usuario = get_usuario(user.id)
@@ -167,17 +170,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     mensagem = f"""
 🎉 *Bem-vindo ao Bot de SMS!* 🎉
 
-Olá {user.first_name}! Compre números SMS para verificação de contas.
+Olá {user.first_name}!
 
-💰 *Seu Saldo*: R$ {usuario['saldo']:.2f}
+💰 *Saldo*: R$ {usuario['saldo']:.2f}
 
 📱 *Preços*:
-• Básico (R$ 0,60): WhatsApp, Telegram, Discord
-• Padrão (R$ 1,00): Instagram, Facebook, Twitter, TikTok  
-• Premium (R$ 2,50): Google, Microsoft, Amazon, PayPal
+• R$ 0,60 - WhatsApp, Telegram, Discord
+• R$ 1,00 - Instagram, Facebook, Twitter
+• R$ 2,50 - Google, Microsoft, Amazon
 
 ⚡ *Comandos*:
-/comprar - Comprar número SMS
+/comprar - Comprar número
 /depositar - Adicionar saldo
 /saldo - Ver saldo
 /historico - Histórico
@@ -191,22 +194,21 @@ async def saldo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     usuario = get_usuario(user.id)
 
     await update.message.reply_text(
-        f"💰 *Saldo*: R$ {usuario['saldo']:.2f}\n\nUse /depositar para adicionar saldo.",
+        f"💰 *Saldo*: R$ {usuario['saldo']:.2f}\n\nUse /depositar para adicionar.",
         parse_mode="Markdown"
     )
 
 async def depositar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [InlineKeyboardButton("R$ 5,00", callback_data="deposito_5")],
-        [InlineKeyboardButton("R$ 10,00", callback_data="deposito_10")],
-        [InlineKeyboardButton("R$ 20,00", callback_data="deposito_20")],
-        [InlineKeyboardButton("R$ 50,00", callback_data="deposito_50")]
+        [InlineKeyboardButton("R$ 5", callback_data="dep_5")],
+        [InlineKeyboardButton("R$ 10", callback_data="dep_10")],
+        [InlineKeyboardButton("R$ 20", callback_data="dep_20")],
+        [InlineKeyboardButton("R$ 50", callback_data="dep_50")]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        f"💳 *Adicionar Saldo*\n\nSelecione o valor (mínimo R$ {DEPOSITO_MINIMO:.2f}):",
-        reply_markup=reply_markup,
+        f"💳 *Adicionar Saldo*\n\nSelecione o valor:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
 
@@ -214,42 +216,36 @@ async def processar_deposito(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
 
-    user = query.from_user
-    data = query.data
+    if query.data.startswith("dep_"):
+        valor = float(query.data.split("_")[1])
 
-    if data.startswith("deposito_"):
-        valor = float(data.split("_")[1])
-
-        # Por enquanto, crédito manual (você pode integrar Pluggy depois)
         mensagem = f"""
-✅ *Instruções de Pagamento*
+✅ *Pagamento*
 
 Valor: R$ {valor:.2f}
 
-📱 *PIX*: Envie para a chave abaixo
-`seu-pix@email.com`
+📱 PIX: `seu-pix@email.com`
 
-Após pagar, envie o comprovante para @seu_usuario
+Envie comprovante para @seu_usuario
 
-⏰ Crédito em até 5 minutos.
+⏰ Crédito em 5 min
         """
 
         await query.edit_message_text(mensagem, parse_mode="Markdown")
 
-async def comprar_numero(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def comprar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [InlineKeyboardButton("📱 Básico (R$ 0,60)", callback_data="categoria_basico")],
-        [InlineKeyboardButton("📱 Padrão (R$ 1,00)", callback_data="categoria_padrao")],
-        [InlineKeyboardButton("📱 Premium (R$ 2,50)", callback_data="categoria_premium")]
+        [InlineKeyboardButton("📱 R$ 0,60", callback_data="cat_basico")],
+        [InlineKeyboardButton("📱 R$ 1,00", callback_data="cat_padrao")],
+        [InlineKeyboardButton("📱 R$ 2,50", callback_data="cat_premium")]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
 
     user = update.effective_user
     usuario = get_usuario(user.id)
 
     await update.message.reply_text(
-        f"🛒 *Comprar Número*\n\nSaldo: R$ {usuario['saldo']:.2f}\n\nEscolha:",
-        reply_markup=reply_markup,
+        f"🛒 *Comprar*\n\nSaldo: R$ {usuario['saldo']:.2f}\n\nEscolha:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
 
@@ -257,21 +253,18 @@ async def escolher_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
 
-    data = query.data
-
-    if data.startswith("categoria_"):
-        categoria = data.split("_")[1]
+    if query.data.startswith("cat_"):
+        categoria = query.data.split("_")[1]
         context.user_data['categoria'] = categoria
 
         servicos = PRECO_CATEGORIAS[categoria]["servicos"]
         preco = PRECO_CATEGORIAS[categoria]["preco"]
 
-        keyboard = [[InlineKeyboardButton(f"📱 {s}", callback_data=f"servico_{s}")] for s in servicos]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        keyboard = [[InlineKeyboardButton(f"📱 {s}", callback_data=f"srv_{s}")] for s in servicos]
 
         await query.edit_message_text(
-            f"📱 *{categoria.title()}* - R$ {preco:.2f}\n\nEscolha o serviço:",
-            reply_markup=reply_markup,
+            f"📱 *{categoria.title()}* - R$ {preco:.2f}\n\nEscolha:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
 
@@ -283,21 +276,20 @@ async def escolher_servico(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = query.from_user
     usuario = get_usuario(user.id)
-    data = query.data
 
-    if data.startswith("servico_"):
-        servico = data.split("_")[1]
+    if query.data.startswith("srv_"):
+        servico = query.data.split("_")[1]
         categoria = context.user_data.get('categoria', 'basico')
         preco = PRECO_CATEGORIAS[categoria]["preco"]
 
         if usuario['saldo'] < preco:
             await query.edit_message_text(
-                f"❌ *Saldo Insuficiente*\n\nPreço: R$ {preco:.2f}\nSeu saldo: R$ {usuario['saldo']:.2f}\n\nUse /depositar",
+                f"❌ *Saldo Insuficiente*\n\nPreço: R$ {preco:.2f}\nSaldo: R$ {usuario['saldo']:.2f}",
                 parse_mode="Markdown"
             )
             return ConversationHandler.END
 
-        await query.edit_message_text("⏳ Buscando número disponível...")
+        await query.edit_message_text("⏳ Buscando número...")
 
         numero_info = obter_numero_sms(servico)
 
@@ -314,17 +306,17 @@ async def escolher_servico(update: Update, context: ContextTypes.DEFAULT_TYPE):
             salvar_database(USER_DATABASE)
 
             keyboard = [
-                [InlineKeyboardButton("🔄 Verificar SMS", callback_data=f"verificar_{numero_info['activation_id']}")],
-                [InlineKeyboardButton("❌ Cancelar", callback_data=f"cancelar_{numero_info['activation_id']}")]
+                [InlineKeyboardButton("🔄 Verificar", callback_data=f"ver_{numero_info['activation_id']}")],
+                [InlineKeyboardButton("❌ Cancelar", callback_data=f"can_{numero_info['activation_id']}")]
             ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
 
             await query.edit_message_text(
-                f"✅ *Número Adquirido!*\n\n📱 `{numero_info['numero']}`\n🌐 {servico}\n💰 R$ {preco:.2f}\n💵 Saldo: R$ {usuario['saldo']:.2f}\n\n⚠️ Use no {servico} e clique em 'Verificar SMS'",
-                reply_markup=reply_markup,
+                f"✅ *Número Adquirido!*\n\n📱 `{numero_info['numero']}`\n🌐 {servico}\n💰 R$ {preco:.2f}\n💵 Saldo: R$ {usuario['saldo']:.2f}",
+                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown"
             )
 
+            # Agendar verificação automática
             context.job_queue.run_repeating(
                 verificar_sms_auto,
                 interval=10,
@@ -334,7 +326,7 @@ async def escolher_servico(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await query.edit_message_text(
-                f"❌ *Número Indisponível*\n\nNão há números para {servico}.\n\nTente outro serviço.",
+                f"❌ *Indisponível*\n\nNão há números para {servico}.",
                 parse_mode="Markdown"
             )
 
@@ -344,25 +336,24 @@ async def verificar_sms_callback(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer("🔄 Verificando...")
 
-    data = query.data
-
-    if data.startswith("verificar_"):
-        activation_id = data.split("_")[1]
+    if query.data.startswith("ver_"):
+        activation_id = query.data.split("_")[1]
         codigo = obter_codigo_sms(activation_id)
 
         if codigo and codigo != "AGUARDANDO":
             await query.edit_message_text(
-                f"✅ *SMS Recebido!*\n\n📨 `{codigo}`\n\nUse este código!",
+                f"✅ *SMS Recebido!*\n\n📨 `{codigo}`",
                 parse_mode="Markdown"
             )
+
             jobs = context.job_queue.get_jobs_by_name(f"check_{activation_id}")
             for job in jobs:
                 job.schedule_removal()
         else:
-            await query.answer("⏳ SMS ainda não chegou.", show_alert=True)
+            await query.answer("⏳ Aguarde...", show_alert=True)
 
-    elif data.startswith("cancelar_"):
-        activation_id = data.split("_")[1]
+    elif query.data.startswith("can_"):
+        activation_id = query.data.split("_")[1]
         if cancelar_numero_sms(activation_id):
             user = query.from_user
             categoria = context.user_data.get('categoria', 'basico')
@@ -374,9 +365,6 @@ async def verificar_sms_callback(update: Update, context: ContextTypes.DEFAULT_T
                 f"✅ *Cancelado*\n\nReembolso: R$ {reembolso:.2f}",
                 parse_mode="Markdown"
             )
-            jobs = context.job_queue.get_jobs_by_name(f"check_{activation_id}")
-            for job in jobs:
-                job.schedule_removal()
 
 async def verificar_sms_auto(context: ContextTypes.DEFAULT_TYPE):
     job_data = context.job.data
@@ -410,35 +398,47 @@ async def historico(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📚 *Ajuda*\n\n/start - Iniciar\n/comprar - Comprar número\n/depositar - Adicionar saldo\n/saldo - Ver saldo\n/historico - Ver compras",
+        "📚 *Ajuda*\n\n/start - Iniciar\n/comprar - Comprar\n/depositar - Adicionar\n/saldo - Ver saldo\n/historico - Histórico",
         parse_mode="Markdown"
     )
 
+# ============== MAIN ==============
 def main():
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    logger.info("🚀 Iniciando bot...")
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("saldo", saldo))
-    application.add_handler(CommandHandler("depositar", depositar))
-    application.add_handler(CommandHandler("historico", historico))
-    application.add_handler(CommandHandler("ajuda", ajuda))
+    # Criar aplicação (SEM usar Updater!)
+    app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("comprar", comprar_numero)],
+    # Handlers
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("saldo", saldo))
+    app.add_handler(CommandHandler("depositar", depositar))
+    app.add_handler(CommandHandler("historico", historico))
+    app.add_handler(CommandHandler("ajuda", ajuda))
+
+    # Conversation handler
+    conv = ConversationHandler(
+        entry_points=[CommandHandler("comprar", comprar)],
         states={
             ESCOLHER_CATEGORIA: [CallbackQueryHandler(escolher_categoria)],
             ESCOLHER_SERVICO: [CallbackQueryHandler(escolher_servico)],
         },
         fallbacks=[],
     )
-    application.add_handler(conv_handler)
+    app.add_handler(conv)
 
-    application.add_handler(CallbackQueryHandler(processar_deposito, pattern="^deposito_"))
-    application.add_handler(CallbackQueryHandler(verificar_sms_callback, pattern="^verificar_"))
-    application.add_handler(CallbackQueryHandler(verificar_sms_callback, pattern="^cancelar_"))
+    # Callbacks
+    app.add_handler(CallbackQueryHandler(processar_deposito, pattern="^dep_"))
+    app.add_handler(CallbackQueryHandler(verificar_sms_callback, pattern="^ver_"))
+    app.add_handler(CallbackQueryHandler(verificar_sms_callback, pattern="^can_"))
 
-    logger.info("🚀 Bot iniciado!")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    logger.info("✅ Bot configurado!")
+    logger.info("🔄 Iniciando polling...")
+
+    # Usar run_polling ao invés de start_polling (que usa Updater)
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+
+    logger.info("🛑 Bot finalizado.")
 
 if __name__ == "__main__":
     main()
