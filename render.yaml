@@ -1,5 +1,5 @@
 services:
-  - type: web
+  - type: worker
     name: bot-sms-telegram
     env: python
     plan: free
@@ -14,3 +14,5 @@ services:
         sync: false
       - key: PLUGGY_CLIENT_SECRET
         sync: false
+      - key: PORT
+        value: "8080"
