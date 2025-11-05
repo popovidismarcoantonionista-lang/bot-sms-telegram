@@ -1,4 +1,21 @@
-pyTelegramBotAPI==4.14.0
+# Telegram Bot
+python-telegram-bot==20.7
+
+# Database
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+
+# HTTP & API
 requests==2.31.0
+urllib3==2.1.0
+
+# Environment
+python-dotenv==1.0.0
+
+# Server (for webhooks)
 flask==3.0.0
 gunicorn==21.2.0
+
+# Utils
+python-dateutil==2.8.2
+pytz==2023.3
