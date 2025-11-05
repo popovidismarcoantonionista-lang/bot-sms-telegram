@@ -1,5 +1,5 @@
 # Telegram Bot
-python-telegram-bot==20.7
+pyTelegramBotAPI
 
 # Database
 sqlalchemy==2.0.23
