@@ -1,102 +1,88 @@
-import os
-from typing import Optional
-from dataclasses import dataclass
-import logging
+"""
+Módulo de configuração centralizado do Bot SMS Telegram
+Carrega e valida todas as variáveis de ambiente
+"""
 
-@dataclass
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Carregar variáveis de ambiente
+env_path = Path(__file__).parent / '.env'
+load_dotenv(env_path)
+
 class Config:
-    """Configurações centralizadas do bot"""
+    """Configurações do bot"""
 
     # Telegram
-    TELEGRAM_BOT_TOKEN: str
-    TELEGRAM_ADMIN_ID: int
+    TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+    TELEGRAM_ADMIN_ID = os.getenv('TELEGRAM_ADMIN_ID')
 
     # Pluggy
-    PLUGGY_CLIENT_ID: str
-    PLUGGY_CLIENT_SECRET: str
-    PLUGGY_ENVIRONMENT: str
-    PLUGGY_API_URL: str
-    PLUGGY_WEBHOOK_URL: str
+    PLUGGY_CLIENT_ID = os.getenv('PLUGGY_CLIENT_ID')
+    PLUGGY_CLIENT_SECRET = os.getenv('PLUGGY_CLIENT_SECRET')
+    PLUGGY_ENVIRONMENT = os.getenv('PLUGGY_ENVIRONMENT', 'production')
+    PLUGGY_ITEM_ID = os.getenv('PLUGGY_ITEM_ID')
+    PLUGGY_BASE_URL = 'https://api.pluggy.ai' if PLUGGY_ENVIRONMENT == 'production' else 'https://api.sandbox.pluggy.ai'
 
-    # SMS Activate
-    SMS_ACTIVATE_API_KEY: str
-    SMS_ACTIVATE_API_URL: str = "https://api.sms-activate.org/stubs/handler_api.php"
+    # SMS-Activate
+    SMS_ACTIVATE_API_KEY = os.getenv('SMS_ACTIVATE_API_KEY')
+    SMS_ACTIVATE_BASE_URL = 'https://api.sms-activate.org/stubs/handler_api.php'
 
     # Database
-    DATABASE_URL: str
+    DATABASE_URL = os.getenv('DATABASE_URL')
+
+    # PIX
+    PIX_KEY = os.getenv('PIX_KEY')
+    PIX_NAME = os.getenv('PIX_NAME', 'Bot SMS')
+    PIX_CITY = os.getenv('PIX_CITY', 'São Paulo')
 
     # Webhook
-    WEBHOOK_HOST: str
-    WEBHOOK_PORT: int
-    WEBHOOK_SECRET: str
+    WEBHOOK_URL = os.getenv('WEBHOOK_URL', '')
+    WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', '')
 
-    # Pricing (em reais)
-    PRICE_BASIC: float = 0.60
-    PRICE_STANDARD: float = 1.00
-    PRICE_PREMIUM: float = 2.50
+    # Configurações do Bot
+    CHECK_PAYMENT_INTERVAL = int(os.getenv('CHECK_PAYMENT_INTERVAL', '30'))
+    MIN_DEPOSIT = float(os.getenv('MIN_DEPOSIT', '1.00'))
+    MAX_DEPOSIT = float(os.getenv('MAX_DEPOSIT', '1000.00'))
 
-    # Refund
-    REFUND_PERCENTAGE: float = 0.50
+    # Preços dos SMS por categoria
+    PRICES = {
+        'basico': 0.60,   # WhatsApp, Telegram, Discord
+        'padrao': 1.00,   # Instagram, Facebook, Twitter, TikTok
+        'premium': 2.50   # Google, Microsoft, Amazon, PayPal
+    }
 
-    # Rate Limiting
-    MAX_REQUESTS_PER_MINUTE: int = 10
-
-    # Logging
-    LOG_LEVEL: str = "INFO"
-    DEBUG: bool = False
+    # Serviços por categoria
+    SERVICES = {
+        'basico': ['wa', 'tg', 'ds'],
+        'padrao': ['ig', 'fb', 'tw', 'tk'],
+        'premium': ['go', 'mm', 'am', 'pa']
+    }
 
     @classmethod
-    def from_env(cls) -> "Config":
-        """Carrega configurações do ambiente"""
-
-        # Validar variáveis obrigatórias
-        required_vars = [
-            "TELEGRAM_BOT_TOKEN",
-            "TELEGRAM_ADMIN_ID",
-            "PLUGGY_CLIENT_ID",
-            "PLUGGY_CLIENT_SECRET",
-            "SMS_ACTIVATE_API_KEY",
-            "WEBHOOK_SECRET"
+    def validate(cls):
+        """Valida se todas as variáveis obrigatórias estão configuradas"""
+        required = [
+            ('TELEGRAM_BOT_TOKEN', cls.TELEGRAM_BOT_TOKEN),
+            ('TELEGRAM_ADMIN_ID', cls.TELEGRAM_ADMIN_ID),
+            ('PLUGGY_CLIENT_ID', cls.PLUGGY_CLIENT_ID),
+            ('PLUGGY_CLIENT_SECRET', cls.PLUGGY_CLIENT_SECRET),
+            ('PLUGGY_ITEM_ID', cls.PLUGGY_ITEM_ID),
+            ('SMS_ACTIVATE_API_KEY', cls.SMS_ACTIVATE_API_KEY),
+            ('DATABASE_URL', cls.DATABASE_URL),
+            ('PIX_KEY', cls.PIX_KEY),
         ]
 
-        missing = [var for var in required_vars if not os.getenv(var)]
+        missing = [name for name, value in required if not value]
+
         if missing:
             raise ValueError(
                 f"Variáveis de ambiente obrigatórias não configuradas: {', '.join(missing)}\n"
-                f"Copie .env.example para .env e configure as variáveis."
+                f"Configure o arquivo .env baseado no .env.example"
             )
 
-        # Determinar URL da API Pluggy baseado no ambiente
-        env = os.getenv("PLUGGY_ENVIRONMENT", "sandbox").lower()
-        pluggy_api_url = (
-            "https://api.pluggy.ai" if env == "production" 
-            else "https://api.pluggy.ai/sandbox"
-        )
+        return True
 
-        return cls(
-            TELEGRAM_BOT_TOKEN=os.getenv("TELEGRAM_BOT_TOKEN"),
-            TELEGRAM_ADMIN_ID=int(os.getenv("TELEGRAM_ADMIN_ID")),
-            PLUGGY_CLIENT_ID=os.getenv("PLUGGY_CLIENT_ID"),
-            PLUGGY_CLIENT_SECRET=os.getenv("PLUGGY_CLIENT_SECRET"),
-            PLUGGY_ENVIRONMENT=env,
-            PLUGGY_API_URL=pluggy_api_url,
-            PLUGGY_WEBHOOK_URL=os.getenv("PLUGGY_WEBHOOK_URL", ""),
-            SMS_ACTIVATE_API_KEY=os.getenv("SMS_ACTIVATE_API_KEY"),
-            DATABASE_URL=os.getenv("DATABASE_URL", "sqlite:///bot_database.db"),
-            WEBHOOK_HOST=os.getenv("WEBHOOK_HOST", "0.0.0.0"),
-            WEBHOOK_PORT=int(os.getenv("WEBHOOK_PORT", "5000")),
-            WEBHOOK_SECRET=os.getenv("WEBHOOK_SECRET"),
-            LOG_LEVEL=os.getenv("LOG_LEVEL", "INFO"),
-            DEBUG=os.getenv("DEBUG", "false").lower() == "true"
-        )
-
-def setup_logging(config: Config):
-    """Configura sistema de logs"""
-    logging.basicConfig(
-        level=getattr(logging, config.LOG_LEVEL),
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler('bot.log'),
-            logging.StreamHandler()
-        ]
-    )
+# Validar configurações ao importar
+Config.validate()
