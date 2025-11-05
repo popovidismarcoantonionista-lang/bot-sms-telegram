@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - worker
+    volumes:
+      - ./logs:/app/logs
+
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: python worker.py
+    volumes:
+      - ./logs:/app/logs
