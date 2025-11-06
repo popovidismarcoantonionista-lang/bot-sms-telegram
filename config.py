@@ -46,7 +46,7 @@ class Config:
 
     # Configurações do Bot
     CHECK_PAYMENT_INTERVAL = int(os.getenv('CHECK_PAYMENT_INTERVAL', '30'))
-    MIN_DEPOSIT = float(os.getenv('MIN_DEPOSIT', '1.00'))
+    MIN_DEPOSIT = float(os.getenv('MIN_DEPOSIT', '5.00'))
     MAX_DEPOSIT = float(os.getenv('MAX_DEPOSIT', '1000.00'))
 
     # Preços dos SMS por categoria (usados no bot.py)
