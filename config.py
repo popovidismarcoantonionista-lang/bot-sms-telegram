@@ -49,17 +49,22 @@ class Config:
     MIN_DEPOSIT = float(os.getenv('MIN_DEPOSIT', '1.00'))
     MAX_DEPOSIT = float(os.getenv('MAX_DEPOSIT', '1000.00'))
 
-    # Preços dos SMS por categoria
+    # Preços dos SMS por categoria (usados no bot.py)
+    PRICE_BASIC = 0.60    # WhatsApp, Telegram, Discord
+    PRICE_STANDARD = 1.00  # Instagram, Facebook, Twitter, TikTok
+    PRICE_PREMIUM = 2.50   # Google, Microsoft, Amazon, PayPal
+
+    # Preços dos SMS por categoria (dict para acesso programático)
     PRICES = {
-        'basico': 0.60,   # WhatsApp, Telegram, Discord
-        'padrao': 1.00,   # Instagram, Facebook, Twitter, TikTok
-        'premium': 2.50   # Google, Microsoft, Amazon, PayPal
+        'basic': PRICE_BASIC,
+        'standard': PRICE_STANDARD,
+        'premium': PRICE_PREMIUM
     }
 
     # Serviços por categoria
     SERVICES = {
-        'basico': ['wa', 'tg', 'ds'],
-        'padrao': ['ig', 'fb', 'tw', 'tk'],
+        'basic': ['wa', 'tg', 'ds'],
+        'standard': ['ig', 'fb', 'tw', 'tk'],
         'premium': ['go', 'mm', 'am', 'pa']
     }
 
@@ -87,19 +92,23 @@ class Config:
 
         return True
 
-# Mapeamento de nomes amigáveis para códigos de serviço SMS-Activate
+# Mapeamento completo: categoria -> serviços com nomes amigáveis
 SERVICE_CATEGORIES = {
-    'WhatsApp': 'wa',
-    'Telegram': 'tg',
-    'Discord': 'ds',
-    'Instagram': 'ig',
-    'Facebook': 'fb',
-    'Twitter': 'tw',
-    'TikTok': 'tk',
-    'Google': 'go',
-    'Microsoft': 'mm',
-    'Amazon': 'am',
-    'PayPal': 'pa'
+    'basic': {
+        'price': Config.PRICE_BASIC,
+        'services': ['wa', 'tg', 'ds'],
+        'names': ['WhatsApp', 'Telegram', 'Discord']
+    },
+    'standard': {
+        'price': Config.PRICE_STANDARD,
+        'services': ['ig', 'fb', 'tw', 'tk'],
+        'names': ['Instagram', 'Facebook', 'Twitter', 'TikTok']
+    },
+    'premium': {
+        'price': Config.PRICE_PREMIUM,
+        'services': ['go', 'mm', 'am', 'pa'],
+        'names': ['Google', 'Microsoft', 'Amazon', 'PayPal']
+    }
 }
 
 # Validar configurações ao importar
