@@ -9,7 +9,7 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Config
-TOKEN = os.getenv("TELEGRAM_TOKEN", "7958563749:AAGUWtp2ISNcegnOHAr1Hfqu_dpigJPJR8s")
+TOKEN = os.getenv("TELEGRAM__TOKEN", "7958563749:AAGUWtp2ISNcegnOHAr1Hfqu_dpigJPJR8s")
 SMS_KEY = os.getenv("SMS_ACTIVATE_API_KEY", "58f78469017177b5defd637edA3983d1")
 SMS_URL = "https://api.sms-activate.org/stubs/handler_api.php"
 
@@ -181,7 +181,7 @@ def cancelar(call):
             reemb = PRECOS[cat]["preco"] * 0.5
             add_saldo(call.from_user.id, reemb)
             bot.edit_message_text(f"✅ *Número Cancelado*\n\nReembolso: R$ {reemb:.2f}", 
-                                 call.message.chat.id, call.message.id, parse_mode="Markdown")
+                             call.message.chat.id, call.message.id, parse_mode="Markdown")
         else:
             bot.answer_callback_query(call.id, "❌ Erro ao cancelar", show_alert=True)
     except:
