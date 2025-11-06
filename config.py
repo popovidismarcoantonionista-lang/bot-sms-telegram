@@ -37,6 +37,9 @@ class Config:
     PIX_NAME = os.getenv('PIX_NAME', 'Bot SMS')
     PIX_CITY = os.getenv('PIX_CITY', 'São Paulo')
 
+    # Debug
+    DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+
     # Webhook
     WEBHOOK_URL = os.getenv('WEBHOOK_URL', '')
     WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', '')
