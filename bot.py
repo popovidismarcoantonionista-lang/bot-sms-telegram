@@ -359,6 +359,34 @@ Verificando...
             await self.check_sms(query, user, data)
         elif data.startswith("cancel_"):
             await self.cancel_purchase(query, user, data)
+
+        elif data == "copy_pix":
+            await query.answer("📋 Chave PIX copiada!", show_alert=False)
+            await query.edit_message_text(
+                f"🔑 *Chave PIX*\n\n"
+                f"Tipo: CPF\n"
+                f"Chave: `{Config.PIX_KEY}`\n"
+                f"Nome: {Config.PIX_NAME}\n\n"
+                f"👆 Toque na chave para copiar!",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("◀️ Voltar", callback_data="depositar")
+                ]])
+            )
+        elif data == "copy_id":
+            db_user = db.get_or_create_user(telegram_id=user.id)
+            await query.answer("🆔 ID copiado!", show_alert=False)
+            await query.edit_message_text(
+                f"🆔 *Seu ID Único*\n\n"
+                f"ID: `{db_user.unique_deposit_id}`\n\n"
+                f"⚠️ Cole este ID na descrição do PIX!\n\n"
+                f"👆 Toque no ID para copiar!",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("◀️ Voltar", callback_data="depositar")
+                ]])
+            )
+
         elif data == "start":  # NEW: Back to start
             await self.show_start_menu(query, user)
 
@@ -423,13 +451,45 @@ Pronto para começar? Use /depositar para adicionar créditos! 💳
         )
 
     async def show_depositar(self, query, user):
-        """Show deposit info (callback version)"""
+        """Show deposit info with complete PIX instructions"""
         db_user = db.get_or_create_user(telegram_id=user.id)
-        await query.edit_message_text(
-            f"💳 Use /depositar para ver as instruções de depósito.\n\n🆔 Seu ID: `{db_user.unique_deposit_id}`",
-            parse_mode=ParseMode.MARKDOWN
-        )
 
+        deposit_text = f"""
+💳 *Depósito via PIX*
+
+Para adicionar créditos à sua conta:
+
+1️⃣ Faça um PIX para:
+  🔑 *Chave PIX (CPF):* `{Config.PIX_KEY}`
+  👤 *Nome:* {Config.PIX_NAME}
+
+2️⃣ *IMPORTANTE:* Na descrição do PIX, coloque:
+  🆔 `{db_user.unique_deposit_id}`
+
+3️⃣ Aguarde confirmação (até 2 minutos)
+
+⚠️ *Atenção:*
+• Valor mínimo: R$ 1,00
+• Valor máximo: R$ 500,00
+• Use EXATAMENTE o ID acima na descrição
+• Sem o ID correto, não identificamos seu pagamento
+
+💡 Seu saldo é creditado automaticamente!
+"""
+
+        keyboard = [
+            [InlineKeyboardButton("✅ Já fiz o PIX", callback_data="check_deposit")],
+            [InlineKeyboardButton("🔑 Copiar Chave PIX", callback_data="copy_pix")],
+            [InlineKeyboardButton("🆔 Copiar meu ID", callback_data="copy_id")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            deposit_text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=reply_markup
+        )
     async def show_comprar(self, query, user):
         """Show purchase options (callback version)"""
         db_user = db.get_or_create_user(telegram_id=user.id)
