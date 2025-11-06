@@ -113,3 +113,9 @@ SERVICE_CATEGORIES = {
 
 # Validar configurações ao importar
 Config.validate()
+
+
+    # Pluggy Payment API (Pix cópia e cola)
+    PLUGGY_API_KEY = os.getenv('PLUGGY_API_KEY')
+    PLUGGY_RECIPIENT_ID = os.getenv('PLUGGY_RECIPIENT_ID')
+    PLUGGY_WEBHOOK_URL = os.getenv('PLUGGY_WEBHOOK_URL', '')
