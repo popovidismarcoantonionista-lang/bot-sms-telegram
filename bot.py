@@ -160,7 +160,7 @@ Para adicionar créditos à sua conta, siga os passos:
 3️⃣ Aguarde a confirmação automática (até 2 minutos)
 
 ⚠️ *Atenção:*
-• Valor mínimo: R$ 1,00
+• Valor mínimo: R$ 5,00
 • Valor máximo: R$ 500,00
 • Use EXATAMENTE o ID acima na descrição
 • Sem o ID correto, não conseguimos identificar seu pagamento
@@ -469,7 +469,7 @@ Para adicionar créditos à sua conta:
 3️⃣ Aguarde confirmação (até 2 minutos)
 
 ⚠️ *Atenção:*
-• Valor mínimo: R$ 1,00
+• Valor mínimo: R$ 5,00
 • Valor máximo: R$ 500,00
 • Use EXATAMENTE o ID acima na descrição
 • Sem o ID correto, não identificamos seu pagamento
