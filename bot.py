@@ -73,7 +73,7 @@ Aqui você pode comprar números temporários para receber SMS de verificação 
 • Padrão (Instagram, Facebook, Twitter, TikTok): R$ {Config.PRICE_STANDARD:.2f}
 • Premium (Google, Microsoft, Amazon, PayPal): R$ {Config.PRICE_PREMIUM:.2f}
 
-🔍 *Comandos Disponíveis:*
+📋 *Comandos Disponíveis:*
 /saldo - Ver seu saldo
 /depositar - Fazer depósito via PIX
 /comprar - Comprar número SMS
@@ -146,11 +146,11 @@ Use /comprar para comprar números SMS
 Para adicionar créditos à sua conta, siga os passos:
 
 1️⃣ Faça um PIX para:
-   📧 *Chave:* `{Config.PIX_KEY}`
-   👤 *Nome:* {Config.PIX_NAME}
+  🔧 *Chave:* `{Config.PIX_KEY}`
+  👤 *Nome: {Config.PIX_NAME}
 
 2️⃣ *IMPORTANTE:* No campo de descrição/mensagem do PIX, coloque:
-   🆔 `{db_user.unique_deposit_id}`
+  🆔 `{db_user.unique_deposit_id}`
 
 3️⃣ Aguarde a confirmação automática (até 2 minutos)
 
@@ -280,8 +280,8 @@ Em caso de problemas, entre em contato com @{Config.PIX_KEY.split('@')[0]}
         """Handle /admin command (only for admin)"""
         user = update.effective_user
 
-        if user.id != Config.TELEGRAM_ADMIN_ID:
-            await update.message.reply_text("⛔ Você não tem permissão para usar este comando.")
+        if user.id != int(Config.TELEGRAM_ADMIN_ID):
+            await update.message.reply_text("❌ Você não tem permissão para usar este comando.")
             return
 
         # Get statistics
@@ -326,7 +326,7 @@ Verificando...
             logger.error(f"Error checking SMS balance: {e}")
 
     async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle button callbacks"""
+        """Handle button callbacks - UPDATED WITH CONFIRM ROUTE"""
         query = update.callback_query
         await query.answer()
 
@@ -348,10 +348,66 @@ Verificando...
             await self.check_deposit(query, user)
         elif data.startswith("buy_"):
             await self.process_purchase(query, user, data)
+        elif data.startswith("confirm_"):  # NEW ROUTE
+            await self.confirm_purchase(query, user, data)
         elif data.startswith("check_sms_"):
             await self.check_sms(query, user, data)
         elif data.startswith("cancel_"):
             await self.cancel_purchase(query, user, data)
+        elif data == "start":  # NEW: Back to start
+            await self.show_start_menu(query, user)
+
+    async def show_start_menu(self, query, user):
+        """Show start menu (callback version) - NEW FUNCTION"""
+        db_user = db.get_or_create_user(
+            telegram_id=user.id,
+            username=user.username,
+            first_name=user.first_name
+        )
+
+        welcome_text = f"""
+🎉 *Bem-vindo ao Bot SMS Temporário!*
+
+Olá {user.first_name}! 👋
+
+Aqui você pode comprar números temporários para receber SMS de verificação de diversos serviços.
+
+💰 *Seu Saldo Atual:* R$ {db_user.balance:.2f}
+
+📱 *Como funciona:*
+1. Faça um depósito via PIX
+2. Escolha o serviço que deseja
+3. Receba o número e aguarde o SMS
+
+💵 *Preços:*
+• Básico (WhatsApp, Telegram, Discord): R$ {Config.PRICE_BASIC:.2f}
+• Padrão (Instagram, Facebook, Twitter, TikTok): R$ {Config.PRICE_STANDARD:.2f}
+• Premium (Google, Microsoft, Amazon, PayPal): R$ {Config.PRICE_PREMIUM:.2f}
+
+📋 *Comandos Disponíveis:*
+/saldo - Ver seu saldo
+/depositar - Fazer depósito via PIX
+/comprar - Comprar número SMS
+/historico - Ver histórico de compras
+/ajuda - Obter ajuda
+
+Pronto para começar? Use /depositar para adicionar créditos! 💳
+"""
+
+        keyboard = [
+            [InlineKeyboardButton("💰 Ver Saldo", callback_data="saldo")],
+            [InlineKeyboardButton("💳 Depositar", callback_data="depositar")],
+            [InlineKeyboardButton("📱 Comprar SMS", callback_data="comprar")],
+            [InlineKeyboardButton("📊 Histórico", callback_data="historico")],
+            [InlineKeyboardButton("❓ Ajuda", callback_data="ajuda")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            welcome_text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=reply_markup
+        )
 
     async def show_saldo(self, query, user):
         """Show balance (callback version)"""
@@ -371,7 +427,37 @@ Verificando...
 
     async def show_comprar(self, query, user):
         """Show purchase options (callback version)"""
-        await query.edit_message_text("📱 Use /comprar para ver as opções de compra.")
+        db_user = db.get_or_create_user(telegram_id=user.id)
+
+        comprar_text = f"""
+📱 *Comprar Número SMS*
+
+Seu saldo: *R$ {db_user.balance:.2f}*
+
+Escolha a categoria do serviço:
+
+💚 *BÁSICO - R$ {Config.PRICE_BASIC:.2f}*
+WhatsApp, Telegram, Discord
+
+💙 *PADRÃO - R$ {Config.PRICE_STANDARD:.2f}*
+Instagram, Facebook, Twitter, TikTok
+
+💜 *PREMIUM - R$ {Config.PRICE_PREMIUM:.2f}*
+Google, Microsoft, Amazon, PayPal
+"""
+
+        keyboard = [
+            [InlineKeyboardButton(f"💚 Básico (R$ {Config.PRICE_BASIC:.2f})", callback_data="buy_basic")],
+            [InlineKeyboardButton(f"💙 Padrão (R$ {Config.PRICE_STANDARD:.2f})", callback_data="buy_standard")],
+            [InlineKeyboardButton(f"💜 Premium (R$ {Config.PRICE_PREMIUM:.2f})", callback_data="buy_premium")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            comprar_text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=reply_markup
+        )
 
     async def show_historico(self, query, user):
         """Show history (callback version)"""
@@ -431,7 +517,7 @@ Verificando...
             )
 
     async def process_purchase(self, query, user, data):
-        """Process SMS purchase"""
+        """Process SMS purchase - COMPLETE IMPLEMENTATION"""
         category = data.replace("buy_", "")
 
         if category not in SERVICE_CATEGORIES:
@@ -446,7 +532,10 @@ Verificando...
         # Check balance
         if db_user.balance < price:
             await query.edit_message_text(
-                f"❌ *Saldo Insuficiente*\n\nPreço: R$ {price:.2f}\nSeu saldo: R$ {db_user.balance:.2f}\n\nUse /depositar para adicionar créditos.",
+                f"❌ *Saldo Insuficiente*\n\n"
+                f"Preço: R$ {price:.2f}\n"
+                f"Seu saldo: R$ {db_user.balance:.2f}\n\n"
+                f"Use /depositar para adicionar créditos.",
                 parse_mode=ParseMode.MARKDOWN
             )
             return
@@ -459,13 +548,132 @@ Verificando...
         for service, name in zip(services, names):
             keyboard.append([InlineKeyboardButton(name, callback_data=f"confirm_{category}_{service}")])
 
+        keyboard.append([InlineKeyboardButton("⬅️ Voltar", callback_data="comprar")])
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await query.edit_message_text(
-            f"📱 *Escolha o serviço:*\n\nPreço: R$ {price:.2f}",
+            f"📱 *Escolha o serviço:*\n\n"
+            f"Preço: R$ {price:.2f}\n"
+            f"Saldo disponível: R$ {db_user.balance:.2f}",
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=reply_markup
         )
+
+    async def confirm_purchase(self, query, user, data):
+        """Confirm and execute SMS purchase - NEW FUNCTION"""
+        # Parse callback data: confirm_category_service
+        parts = data.split("_")
+        if len(parts) != 3:
+            await query.answer("❌ Erro no formato.", show_alert=True)
+            return
+
+        category = parts[1]
+        service = parts[2]
+
+        if category not in SERVICE_CATEGORIES:
+            await query.answer("❌ Categoria inválida.", show_alert=True)
+            return
+
+        category_info = SERVICE_CATEGORIES[category]
+        price = category_info['price']
+        service_name = category_info['names'][category_info['services'].index(service)]
+
+        db_user = db.get_or_create_user(telegram_id=user.id)
+
+        # Double-check balance
+        if db_user.balance < price:
+            await query.edit_message_text(
+                f"❌ *Saldo Insuficiente*\n\n"
+                f"Seu saldo: R$ {db_user.balance:.2f}\n"
+                f"Necessário: R$ {price:.2f}",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return
+
+        # Show processing message
+        await query.edit_message_text("⏳ Processando compra...\n\nBuscando número disponível...")
+
+        try:
+            # Get number from SMS-Activate
+            result = sms_activate.get_number(service=service, country='0')  # 0 = Russia (cheaper)
+
+            if not result:
+                await query.edit_message_text(
+                    f"❌ *Erro na Compra*\n\n"
+                    f"Não há números disponíveis para {service_name} no momento.\n\n"
+                    f"Tente novamente em alguns minutos ou escolha outro serviço.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return
+
+            activation_id = result['activation_id']
+            phone_number = result['phone_number']
+
+            # Deduct balance
+            db.update_user_balance(user.id, -price)
+
+            # Create transaction
+            db.create_transaction(
+                telegram_id=user.id,
+                trans_type='purchase',
+                amount=-price,
+                description=f"Compra SMS {service_name}"
+            )
+
+            # Create SMS purchase record
+            db.create_sms_purchase(
+                telegram_id=user.id,
+                service=service,
+                phone=phone_number,
+                activation_id=activation_id,
+                price=price
+            )
+
+            logger.info(f"SMS purchase successful: {user.id} - {service_name} - {phone_number}")
+
+            # Success message with number and instructions
+            success_text = f"""
+✅ *Compra Realizada com Sucesso!*
+
+📱 *Serviço:* {service_name}
+📞 *Número:* `{phone_number}`
+💰 *Preço:* R$ {price:.2f}
+💳 *Novo Saldo:* R$ {db.get_user_balance(user.id):.2f}
+
+📝 *Instruções:*
+1. Use o número acima no serviço {service_name}
+2. Aguarde o SMS de verificação (até 20 minutos)
+3. Clique em "Verificar SMS" abaixo para receber o código
+
+⚠️ *Importante:*
+• Você tem 20 minutos para receber o SMS
+• Se não receber, você pode cancelar e receber 50% de reembolso
+• Após receber o código, marque como completo
+
+*ID da Ativação:* `{activation_id}`
+"""
+
+            keyboard = [
+                [InlineKeyboardButton("🔍 Verificar SMS", callback_data=f"check_sms_{activation_id}")],
+                [InlineKeyboardButton("❌ Cancelar (50% reembolso)", callback_data=f"cancel_{activation_id}")],
+                [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                success_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=reply_markup
+            )
+
+        except Exception as e:
+            logger.error(f"Error in confirm_purchase: {e}")
+            await query.edit_message_text(
+                f"❌ *Erro ao processar compra*\n\n"
+                f"Ocorreu um erro inesperado. Seu saldo não foi debitado.\n\n"
+                f"Por favor, tente novamente ou contate o suporte.",
+                parse_mode=ParseMode.MARKDOWN
+            )
 
     async def check_sms(self, query, user, data):
         """Check SMS status"""
