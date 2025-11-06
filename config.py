@@ -119,3 +119,6 @@ Config.validate()
 PLUGGY_API_KEY = os.getenv('PLUGGY_API_KEY')
 PLUGGY_RECIPIENT_ID = os.getenv('PLUGGY_RECIPIENT_ID')
 PLUGGY_WEBHOOK_URL = os.getenv('PLUGGY_WEBHOOK_URL', '')
+
+# Apex Seguidores API
+APEX_API_KEY = os.getenv('APEX_API_KEY')
