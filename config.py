@@ -68,6 +68,10 @@ class Config:
         'premium': ['go', 'mm', 'am', 'pa']
     }
 
+
+    # Apex Seguidores API
+    APEX_API_KEY = os.getenv('APEX_API_KEY', '')
+
     @classmethod
     def validate(cls):
         """Valida se todas as variáveis obrigatórias estão configuradas"""
