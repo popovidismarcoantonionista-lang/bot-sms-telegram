@@ -740,9 +740,26 @@ Google, Microsoft, Amazon, PayPal
             await query.answer("❌ Erro ao cancelar compra.", show_alert=True)
 
     def run(self):
+        """Start the bot with retry logic"""
+        import time
+        max_retries = 5
+        retry_delay = 5
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Starting bot... (attempt {attempt + 1}/{max_retries})")
+                self.app.run_polling(allowed_updates=Update.ALL_TYPES)
+                break  # Success
+            except Exception as e:
+                logger.error(f"Error starting bot (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                else:
+                    logger.error("Max retries reached. Exiting.")
+                    raise
         """Start the bot"""
         logger.info("Starting bot...")
-        self.app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     bot = SMSBot()
