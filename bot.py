@@ -26,10 +26,15 @@ db.init_db()
 class SMSBot:
     def __init__(self):
         self.app = Application.builder().token(Config.TELEGRAM_BOT_TOKEN).build()
-        self.setup_handlers()
-
-    def setup_handlers(self):
-        """Setup command and callback handlers"""
+        # Configure connection timeouts
+        from telegram.request import HTTPXRequest
+        request = HTTPXRequest(
+            connection_pool_size=10,
+            connect_timeout=20.0,
+            read_timeout=20.0,
+            write_timeout=20.0,
+            pool_timeout=20.0
+        )
         self.app.add_handler(CommandHandler("start", self.start_command))
         self.app.add_handler(CommandHandler("saldo", self.saldo_command))
         self.app.add_handler(CommandHandler("depositar", self.depositar_command))
