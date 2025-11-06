@@ -9,6 +9,7 @@ from config import Config, SERVICE_CATEGORIES
 from database import db, User, Transaction, SMSPurchase
 from pluggy_checker import pluggy_checker
 from sms_activate import sms_activate
+from apex_seguidores import apex_api
 
 # Configure logging
 logging.basicConfig(
@@ -41,6 +42,7 @@ class SMSBot:
         self.app.add_handler(CommandHandler("comprar", self.comprar_command))
         self.app.add_handler(CommandHandler("historico", self.historico_command))
         self.app.add_handler(CommandHandler("ajuda", self.ajuda_command))
+        self.app.add_handler(CommandHandler("social", self.social_command))
 
         if Config.TELEGRAM_ADMIN_ID:
             self.app.add_handler(CommandHandler("admin", self.admin_command))
@@ -93,6 +95,7 @@ Pronto para começar? Use /depositar para adicionar créditos! 💳\n\n📞 Supo
             [InlineKeyboardButton("💳 Depositar", callback_data="depositar")],
             [InlineKeyboardButton("📱 Comprar SMS", callback_data="comprar")],
             [InlineKeyboardButton("📊 Histórico", callback_data="historico")],
+            [InlineKeyboardButton("📱 Redes Sociais", callback_data="social")],
             [InlineKeyboardButton("❓ Ajuda", callback_data="ajuda")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -803,6 +806,207 @@ Google, Microsoft, Amazon, PayPal
         except Exception as e:
             logger.error(f"Error canceling purchase: {e}")
             await query.answer("❌ Erro ao cancelar compra.", show_alert=True)
+
+
+    async def social_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /social command - Apex Seguidores services"""
+        user = update.effective_user
+        db_user = db.get_or_create_user(telegram_id=user.id)
+
+        social_text = f"""
+📱 *Serviços de Redes Sociais*
+
+Seu saldo: *R$ {db_user.balance:.2f}*
+
+Compre seguidores, curtidas, views e mais!
+
+Escolha a rede social:
+
+📸 *Instagram* - Seguidores, Curtidas, Comentários
+🎵 *TikTok* - Seguidores, Curtidas, Views
+▶️ *YouTube* - Inscritos, Views, Curtidas
+🐦 *Twitter* - Seguidores, Retweets
+📘 *Facebook* - Curtidas de página
+
+💡 *Como funciona:*
+1. Escolha a rede social
+2. Escolha o tipo de serviço
+3. Cole o link do perfil/post
+4. Digite a quantidade
+5. Confirme e pronto!
+
+⚠️ Entrega: De instantâneo a 24h
+"""
+
+        keyboard = [
+            [InlineKeyboardButton("📸 Instagram", callback_data="apex_instagram")],
+            [InlineKeyboardButton("🎵 TikTok", callback_data="apex_tiktok")],
+            [InlineKeyboardButton("▶️ YouTube", callback_data="apex_youtube")],
+            [InlineKeyboardButton("🐦 Twitter", callback_data="apex_twitter")],
+            [InlineKeyboardButton("📘 Facebook", callback_data="apex_facebook")],
+            [InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await update.message.reply_text(
+            social_text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=reply_markup
+        )
+
+    async def show_social_menu(self, query, user):
+        """Show social services menu (callback version)"""
+        db_user = db.get_or_create_user(telegram_id=user.id)
+
+        social_text = f"""
+📱 *Serviços de Redes Sociais*
+
+Seu saldo: *R$ {db_user.balance:.2f}*
+
+Escolha a rede social:
+"""
+
+        keyboard = [
+            [InlineKeyboardButton("📸 Instagram", callback_data="apex_instagram")],
+            [InlineKeyboardButton("🎵 TikTok", callback_data="apex_tiktok")],
+            [InlineKeyboardButton("▶️ YouTube", callback_data="apex_youtube")],
+            [InlineKeyboardButton("🐦 Twitter", callback_data="apex_twitter")],
+            [InlineKeyboardButton("📘 Facebook", callback_data="apex_facebook")],
+            [InlineKeyboardButton("◀️ Voltar", callback_data="start")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            social_text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=reply_markup
+        )
+
+    async def show_apex_category(self, query, user, platform):
+        """Show services for a specific platform"""
+        await query.edit_message_text(f"🔍 Carregando serviços de {platform.title()}...")
+
+        db_user = db.get_or_create_user(telegram_id=user.id)
+
+        try:
+            # Get services from Apex API
+            services = apex_api.get_services_by_category(platform)
+
+            if not services:
+                await query.edit_message_text(
+                    f"❌ *Erro ao carregar serviços*\n\n"
+                    f"Não foi possível conectar à Apex Seguidores.\n"
+                    f"Verifique se a API Key está configurada.\n\n"
+                    f"Contato: @marcodeveloper604",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return
+
+            # Show top services (first 10)
+            text = f"""
+📱 *{platform.title()} - Serviços Disponíveis*
+
+Seu saldo: R$ {db_user.balance:.2f}
+
+Escolha o serviço:
+"""
+
+            keyboard = []
+            for i, service in enumerate(services[:10]):
+                service_id = service.get('service')
+                name = service.get('name', 'N/A')[:40]  # Limit name length
+                rate = float(service.get('rate', 0))
+
+                # Format button text
+                button_text = f"{name} - R$ {rate:.2f}/1k"
+                keyboard.append([
+                    InlineKeyboardButton(
+                        button_text,
+                        callback_data=f"apex_service_{service_id}"
+                    )
+                ])
+
+            keyboard.append([InlineKeyboardButton("◀️ Voltar", callback_data="social")])
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await query.edit_message_text(
+                text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=reply_markup
+            )
+
+        except Exception as e:
+            logger.error(f"Error loading Apex services: {e}")
+            await query.edit_message_text(
+                f"❌ Erro ao carregar serviços.\n\n"
+                f"Tente novamente ou contate @marcodeveloper604",
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+    async def show_apex_service_details(self, query, user, service_id):
+        """Show details of a specific service"""
+        await query.edit_message_text("⏳ Carregando detalhes...")
+
+        try:
+            # Get all services to find this one
+            services = apex_api.get_services()
+
+            if not services:
+                await query.answer("❌ Erro ao conectar", show_alert=True)
+                return
+
+            # Find service by ID
+            service = next((s for s in services if str(s.get('service')) == str(service_id)), None)
+
+            if not service:
+                await query.answer("❌ Serviço não encontrado", show_alert=True)
+                return
+
+            name = service.get('name')
+            rate = float(service.get('rate', 0))
+            min_qty = int(service.get('min', 0))
+            max_qty = int(service.get('max', 0))
+
+            text = f"""
+📦 *{name}*
+
+💰 *Preço:* R$ {rate:.2f} por 1000
+📊 *Mínimo:* {min_qty}
+📊 *Máximo:* {max_qty:,}
+
+📝 *Como comprar:*
+1. Cole o link do perfil/post
+2. Digite a quantidade
+3. Confirme o pedido
+
+💡 *Exemplos de cálculo:*
+• 100 = R$ {(rate/1000)*100:.2f}
+• 500 = R$ {(rate/1000)*500:.2f}
+• 1000 = R$ {rate:.2f}
+
+Para começar, envie o link do perfil/post.
+"""
+
+            keyboard = [[InlineKeyboardButton("◀️ Voltar", callback_data="social")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # Store service info in context for next step
+            context.user_data['apex_service_id'] = service_id
+            context.user_data['apex_service_rate'] = rate
+            context.user_data['apex_service_min'] = min_qty
+            context.user_data['apex_service_max'] = max_qty
+            context.user_data['apex_service_name'] = name
+            context.user_data['waiting_for_link'] = True
+
+            await query.edit_message_text(
+                text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=reply_markup
+            )
+
+        except Exception as e:
+            logger.error(f"Error showing service details: {e}")
+            await query.answer("❌ Erro ao carregar", show_alert=True)
 
     def run(self):
         """Start the bot with retry logic"""
