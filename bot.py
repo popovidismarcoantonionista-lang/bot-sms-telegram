@@ -85,7 +85,7 @@ Aqui você pode comprar números temporários para receber SMS de verificação 
 /historico - Ver histórico de compras
 /ajuda - Obter ajuda
 
-Pronto para começar? Use /depositar para adicionar créditos! 💳
+Pronto para começar? Use /depositar para adicionar créditos! 💳\n\n📞 Suporte: @marcodeveloper604
 """
 
         keyboard = [
@@ -269,7 +269,7 @@ R: Após fazer o PIX com o ID correto, até 2 minutos.
 R: WhatsApp, Telegram, Discord, Instagram, Facebook, Twitter, TikTok, Google, Microsoft, Amazon, PayPal e mais!
 
 *Suporte:*
-Em caso de problemas, entre em contato com @{Config.PIX_KEY.split('@')[0]}
+Em caso de problemas, entre em contato:\n👤 @marcodeveloper604
 
 *Comandos:*
 /start - Início
@@ -424,7 +424,7 @@ Aqui você pode comprar números temporários para receber SMS de verificação 
 /historico - Ver histórico de compras
 /ajuda - Obter ajuda
 
-Pronto para começar? Use /depositar para adicionar créditos! 💳
+Pronto para começar? Use /depositar para adicionar créditos! 💳\n\n📞 Suporte: @marcodeveloper604
 """
 
         keyboard = [
@@ -736,7 +736,7 @@ Google, Microsoft, Amazon, PayPal
             await query.edit_message_text(
                 f"❌ *Erro ao processar compra*\n\n"
                 f"Ocorreu um erro inesperado. Seu saldo não foi debitado.\n\n"
-                f"Por favor, tente novamente ou contate o suporte.",
+                f"Por favor, tente novamente ou contate @marcodeveloper604",
                 parse_mode=ParseMode.MARKDOWN
             )
 
