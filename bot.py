@@ -352,6 +352,8 @@ Verificando...
             await self.show_historico(query, user)
         elif data == "ajuda":
             await self.show_ajuda(query, user)
+        elif data == "social":
+            await self.show_social_menu(query, user)
         elif data == "check_deposit":
             await self.check_deposit(query, user)
         elif data.startswith("buy_"):
