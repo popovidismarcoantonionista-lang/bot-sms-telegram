@@ -84,5 +84,20 @@ class Config:
 
         return True
 
+# Mapeamento de nomes amigáveis para códigos de serviço SMS-Activate
+SERVICE_CATEGORIES = {
+    'WhatsApp': 'wa',
+    'Telegram': 'tg',
+    'Discord': 'ds',
+    'Instagram': 'ig',
+    'Facebook': 'fb',
+    'Twitter': 'tw',
+    'TikTok': 'tk',
+    'Google': 'go',
+    'Microsoft': 'mm',
+    'Amazon': 'am',
+    'PayPal': 'pa'
+}
+
 # Validar configurações ao importar
 Config.validate()
