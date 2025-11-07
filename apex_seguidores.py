@@ -140,6 +140,11 @@ class ApexSeguidoresAPI:
 
         return None
 
+    # Alias para compatibilidade
+    def get_order_status(self, order_id: int) -> Optional[Dict]:
+        """Alias para check_order_status"""
+        return self.check_order_status(order_id)
+
     def get_services_by_category(self, category: str = None) -> List[Dict]:
         """
         Filtra serviços por categoria
@@ -181,6 +186,21 @@ class ApexSeguidoresAPI:
             f"💰 Preço: R$ {price:.2f} por 1000\n"
             f"📊 Min: {min_qty} | Max: {max_qty}"
         )
+
+    def get_multiple_orders_status(self, order_ids: List[int]) -> Dict[int, Optional[Dict]]:
+        """
+        Verifica status de múltiplos pedidos
+
+        Args:
+            order_ids: Lista de IDs dos pedidos
+
+        Returns:
+            Dict com order_id como chave e status como valor
+        """
+        results = {}
+        for order_id in order_ids:
+            results[order_id] = self.check_order_status(order_id)
+        return results
 
 
 # Instância global
