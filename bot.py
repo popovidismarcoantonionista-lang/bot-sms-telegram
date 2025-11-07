@@ -379,7 +379,7 @@ Verificando...
         elif data.startswith("confirm_apex_"):
             # Handle Apex order confirmation with quantity
             await self.process_apex_order(query, user, data, context)
-                elif data.startswith("apex_"):
+        elif data.startswith("apex_"):
             # Handle Apex platform selection  
             platform = data.replace("apex_", "")
             await self.show_apex_category(query, user, platform)
