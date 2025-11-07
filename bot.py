@@ -54,7 +54,8 @@ class SMSBot:
             filters.TEXT & ~filters.COMMAND,
             self.handle_text_message
         ))
-\n                # Callback handlers
+
+        # Callback handlers
         self.app.add_handler(CallbackQueryHandler(self.button_callback))
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
