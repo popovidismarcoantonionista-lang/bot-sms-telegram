@@ -364,6 +364,14 @@ Verificando...
             await self.check_sms(query, user, data)
         elif data.startswith("cancel_"):
             await self.cancel_purchase(query, user, data)
+        elif data.startswith("apex_service_"):
+            # Handle Apex service selection
+            service_id = data.replace("apex_service_", "")
+            await self.show_apex_service_details(query, user, service_id, context)
+        elif data.startswith("apex_"):
+            # Handle Apex platform selection  
+            platform = data.replace("apex_", "")
+            await self.show_apex_category(query, user, platform)
 
         elif data == "copy_pix":
             await query.answer("📋 Chave PIX copiada!", show_alert=False)
