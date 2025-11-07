@@ -47,7 +47,14 @@ class SMSBot:
         if Config.TELEGRAM_ADMIN_ID:
             self.app.add_handler(CommandHandler("admin", self.admin_command))
 
-        # Callback handlers
+
+        # Message handler for Apex links
+        from telegram.ext import MessageHandler, filters
+        self.app.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            self.handle_text_message
+        ))
+\n                # Callback handlers
         self.app.add_handler(CallbackQueryHandler(self.button_callback))
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -368,7 +375,10 @@ Verificando...
             # Handle Apex service selection
             service_id = data.replace("apex_service_", "")
             await self.show_apex_service_details(query, user, service_id, context)
-        elif data.startswith("apex_"):
+        elif data.startswith("confirm_apex_"):
+            # Handle Apex order confirmation with quantity
+            await self.process_apex_order(query, user, data, context)
+                elif data.startswith("apex_"):
             # Handle Apex platform selection  
             platform = data.replace("apex_", "")
             await self.show_apex_category(query, user, platform)
@@ -953,16 +963,21 @@ Escolha o serviço:
                 parse_mode=ParseMode.MARKDOWN
             )
 
-    async def show_apex_service_details(self, query, user, service_id):
-        """Show details of a specific service"""
+    async def show_apex_service_details(self, query, user, service_id, context):
+        """Show details and quantity options for a specific Apex service"""
         await query.edit_message_text("⏳ Carregando detalhes...")
+
+        db_user = db.get_or_create_user(telegram_id=user.id)
 
         try:
             # Get all services to find this one
             services = apex_api.get_services()
 
             if not services:
-                await query.answer("❌ Erro ao conectar", show_alert=True)
+                await query.edit_message_text(
+                    "❌ *Erro ao conectar*\n\nNão foi possível carregar serviços da Apex.\nTente novamente em alguns instantes.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
                 return
 
             # Find service by ID
@@ -981,32 +996,31 @@ Escolha o serviço:
 📦 *{name}*
 
 💰 *Preço:* R$ {rate:.2f} por 1000
-📊 *Mínimo:* {min_qty}
-📊 *Máximo:* {max_qty:,}
 
-📝 *Como comprar:*
-1. Cole o link do perfil/post
-2. Digite a quantidade
-3. Confirme o pedido
+📊 *Limites:*
+• Mínimo: {min_qty}
+• Máximo: {max_qty:,}
 
-💡 *Exemplos de cálculo:*
+💡 *Exemplos de preço:*
 • 100 = R$ {(rate/1000)*100:.2f}
 • 500 = R$ {(rate/1000)*500:.2f}
 • 1000 = R$ {rate:.2f}
+• 5000 = R$ {(rate/1000)*5000:.2f}
 
-Para começar, envie o link do perfil/post.
+📱 *Seu saldo:* R$ {db_user.balance:.2f}
+
+Escolha a quantidade desejada:
 """
 
-            keyboard = [[InlineKeyboardButton("◀️ Voltar", callback_data="social")]]
+            # Create quantity buttons
+            keyboard = [
+                [InlineKeyboardButton("100", callback_data=f"confirm_apex_{service_id}_100")],
+                [InlineKeyboardButton("500", callback_data=f"confirm_apex_{service_id}_500")],
+                [InlineKeyboardButton("1000", callback_data=f"confirm_apex_{service_id}_1000")],
+                [InlineKeyboardButton("5000", callback_data=f"confirm_apex_{service_id}_5000")],
+                [InlineKeyboardButton("◀️ Voltar", callback_data="social")]
+            ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-
-            # Store service info in context for next step
-            context.user_data['apex_service_id'] = service_id
-            context.user_data['apex_service_rate'] = rate
-            context.user_data['apex_service_min'] = min_qty
-            context.user_data['apex_service_max'] = max_qty
-            context.user_data['apex_service_name'] = name
-            context.user_data['waiting_for_link'] = True
 
             await query.edit_message_text(
                 text,
@@ -1015,8 +1029,232 @@ Para começar, envie o link do perfil/post.
             )
 
         except Exception as e:
-            logger.error(f"Error showing service details: {e}")
-            await query.answer("❌ Erro ao carregar", show_alert=True)
+            logger.error(f"Error showing Apex service details: {e}")
+            await query.edit_message_text(
+                f"❌ Erro ao carregar detalhes.\n\nTente novamente ou contate @marcodevelo per604",
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+
+    async def process_apex_order(self, query, user, data, context):
+        """Process complete Apex social media order"""
+        # Parse: confirm_apex_{service_id}_{quantity}
+        parts = data.replace("confirm_apex_", "").split("_")
+
+        if len(parts) != 2:
+            await query.answer("❌ Erro no formato", show_alert=True)
+            return
+
+        service_id = parts[0]
+        try:
+            quantity = int(parts[1])
+        except ValueError:
+            await query.answer("❌ Quantidade inválida", show_alert=True)
+            return
+
+        db_user = db.get_or_create_user(telegram_id=user.id)
+
+        await query.edit_message_text("⏳ Processando pedido...\n\nAguarde...")
+
+        try:
+            # Get service details
+            services = apex_api.get_services()
+            service = next((s for s in services if str(s.get('service')) == str(service_id)), None)
+
+            if not service:
+                await query.edit_message_text("❌ Serviço não encontrado.")
+                return
+
+            name = service.get('name')
+            rate = float(service.get('rate', 0))
+            min_qty = int(service.get('min', 0))
+            max_qty = int(service.get('max', 0))
+
+            # Calculate price
+            price = (rate / 1000) * quantity
+
+            # Validate quantity
+            if quantity < min_qty or quantity > max_qty:
+                await query.edit_message_text(
+                    f"❌ *Quantidade Inválida*\n\n"
+                    f"Mínimo: {min_qty}\n"
+                    f"Máximo: {max_qty:,}\n"
+                    f"Você escolheu: {quantity}",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return
+
+            # Check balance
+            if db_user.balance < price:
+                await query.edit_message_text(
+                    f"❌ *Saldo Insuficiente*\n\n"
+                    f"Preço: R$ {price:.2f}\n"
+                    f"Seu saldo: R$ {db_user.balance:.2f}\n\n"
+                    f"Use /depositar para adicionar créditos.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return
+
+            # Ask for profile link
+            await query.edit_message_text(
+                f"📱 *{name}*\n\n"
+                f"Quantidade: *{quantity}*\n"
+                f"Preço total: *R$ {price:.2f}*\n\n"
+                f"📝 *Envie o link do perfil ou post:*\n"
+                f"Exemplo: https://instagram.com/seuuser\n"
+                f"ou https://tiktok.com/@seuuser",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("❌ Cancelar", callback_data="social")
+                ]])
+            )
+
+            # Store order info in context
+            context.user_data['apex_pending_order'] = {
+                'service_id': service_id,
+                'service_name': name,
+                'quantity': quantity,
+                'price': price,
+                'rate': rate
+            }
+            context.user_data['waiting_for_apex_link'] = True
+
+        except Exception as e:
+            logger.error(f"Error processing Apex order: {e}")
+            await query.edit_message_text(
+                f"❌ *Erro ao processar pedido*\n\n"
+                f"Ocorreu um erro inesperado.\n"
+                f"Por favor, tente novamente ou contate @marcodevelo per604",
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+
+    async def handle_text_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle text messages for Apex link input"""
+        user = update.effective_user
+        message_text = update.message.text.strip()
+
+        # Check if waiting for Apex link
+        if context.user_data.get('waiting_for_apex_link'):
+            await self.process_apex_link(update, context, message_text)
+
+
+    async def process_apex_link(self, update: Update, context: ContextTypes.DEFAULT_TYPE, link: str):
+        """Process Apex order with provided link"""
+        user = update.effective_user
+        order_info = context.user_data.get('apex_pending_order')
+
+        if not order_info:
+            await update.message.reply_text("❌ Erro: Pedido não encontrado. Tente novamente.")
+            context.user_data['waiting_for_apex_link'] = False
+            return
+
+        db_user = db.get_or_create_user(telegram_id=user.id)
+
+        # Validate link format (basic check)
+        if not ('http://' in link or 'https://' in link or '@' in link):
+            await update.message.reply_text(
+                "❌ Link inválido!\n\n"
+                "Envie um link válido, por exemplo:\n"
+                "• https://instagram.com/seuuser\n"
+                "• https://tiktok.com/@seuuser\n"
+                "• @seuuser"
+            )
+            return
+
+        service_id = order_info['service_id']
+        service_name = order_info['service_name']
+        quantity = order_info['quantity']
+        price = order_info['price']
+
+        # Double-check balance
+        if db_user.balance < price:
+            await update.message.reply_text(
+                f"❌ *Saldo Insuficiente*\n\n"
+                f"Preço: R$ {price:.2f}\n"
+                f"Seu saldo: R$ {db_user.balance:.2f}",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            context.user_data['waiting_for_apex_link'] = False
+            return
+
+        await update.message.reply_text("⏳ Criando pedido na Apex Seguidores...\n\nAguarde...")
+
+        try:
+            # Create order via Apex API
+            order_result = apex_api.create_order(
+                service_id=int(service_id),
+                link=link,
+                quantity=quantity
+            )
+
+            if not order_result:
+                await update.message.reply_text(
+                    "❌ *Erro ao criar pedido*\n\n"
+                    "Não foi possível criar o pedido na Apex.\n"
+                    "Verifique se o link está correto e tente novamente.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                context.user_data['waiting_for_apex_link'] = False
+                return
+
+            order_id = order_result.get('order_id')
+
+            # Deduct balance
+            db.update_user_balance(user.id, -price)
+
+            # Create transaction
+            db.create_transaction(
+                telegram_id=user.id,
+                trans_type='purchase',
+                amount=-price,
+                description=f"Apex - {service_name} ({quantity})"
+            )
+
+            logger.info(f"Apex order created: {user.id} - {service_name} - {quantity} - Order#{order_id}")
+
+            # Success message
+            success_text = f"""
+✅ *Pedido Criado com Sucesso!*
+
+📦 *Serviço:* {service_name}
+🔢 *Quantidade:* {quantity}
+🔗 *Link:* `{link}`
+💰 *Valor:* R$ {price:.2f}
+💳 *Novo Saldo:* R$ {db.get_user_balance(user.id):.2f}
+
+🆔 *ID do Pedido:* `{order_id}`
+
+⏱️ *Entrega:* De instantâneo a 24h
+
+📊 *Status:* {order_result.get('status', 'Pending')}
+
+💡 O pedido já está em processamento pela Apex Seguidores!
+"""
+
+            keyboard = [[InlineKeyboardButton("🏠 Menu Principal", callback_data="start")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            await update.message.reply_text(
+                success_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=reply_markup
+            )
+
+            # Clear context
+            context.user_data['waiting_for_apex_link'] = False
+            context.user_data.pop('apex_pending_order', None)
+
+        except Exception as e:
+            logger.error(f"Error creating Apex order: {e}")
+            await update.message.reply_text(
+                f"❌ *Erro ao criar pedido*\n\n"
+                f"Ocorreu um erro inesperado. Seu saldo não foi debitado.\n\n"
+                f"Por favor, tente novamente ou contate @marcodevelo per604",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            context.user_data['waiting_for_apex_link'] = False
+            context.user_data.pop('apex_pending_order', None)
 
     def run(self):
         """Start the bot with retry logic"""
