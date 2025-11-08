@@ -1,175 +1,156 @@
 #!/usr/bin/env python3
 """
-Script de Diagnóstico do Bot SMS Telegram
-Verifica configurações e conexões antes de rodar o bot
+DIAGNÓSTICO DO BOT - Verifica todos os problemas possíveis
 """
 
-import os
+import asyncio
 import sys
-from pathlib import Path
+import os
 
-print("🔍 DIAGNÓSTICO DO BOT SMS TELEGRAM\n")
-print("="*50)
+print("🔍 INICIANDO DIAGNÓSTICO...")
+print("=" * 70)
 
-# 1. Check Python version
-print("\n1️⃣  VERIFICANDO PYTHON:")
-print(f"   Versão: {sys.version}")
-if sys.version_info < (3, 8):
-    print("   ❌ ERRO: Python 3.8+ é necessário!")
-else:
-    print("   ✅ Versão OK")
+# 1. VERIFICAR DEPENDÊNCIAS
+print("\n📦 Verificando dependências...")
+dependencias = {
+    "telegram": "python-telegram-bot",
+    "aiosqlite": "aiosqlite",
+    "dotenv": "python-dotenv"
+}
 
-# 2. Check .env file
-print("\n2️⃣  VERIFICANDO ARQUIVO .env:")
-env_path = Path('.env')
-if env_path.exists():
-    print("   ✅ Arquivo .env encontrado")
+missing = []
+for module, package in dependencias.items():
+    try:
+        if module == "telegram":
+            import telegram
+            print(f"  ✅ {package}: {telegram.__version__}")
+        elif module == "aiosqlite":
+            import aiosqlite
+            print(f"  ✅ {package}: instalado")
+        elif module == "dotenv":
+            from dotenv import load_dotenv
+            print(f"  ✅ {package}: instalado")
+    except ImportError:
+        missing.append(package)
+        print(f"  ❌ {package}: NÃO INSTALADO")
 
-    # Load and check required vars
-    from dotenv import load_dotenv
-    load_dotenv()
-
-    required_vars = [
-        'TELEGRAM_BOT_TOKEN',
-        'TELEGRAM_ADMIN_ID',
-        'PLUGGY_CLIENT_ID',
-        'PLUGGY_CLIENT_SECRET',
-        'PLUGGY_ITEM_ID',
-        'SMS_ACTIVATE_API_KEY',
-        'DATABASE_URL',
-        'PIX_KEY'
-    ]
-
-    print("\n   Variáveis de ambiente:")
-    missing = []
-    for var in required_vars:
-        value = os.getenv(var)
-        if value:
-            # Show partial value for security
-            if 'TOKEN' in var or 'KEY' in var or 'SECRET' in var:
-                display = value[:10] + "..." if len(value) > 10 else "***"
-            else:
-                display = value
-            print(f"   ✅ {var}: {display}")
-        else:
-            print(f"   ❌ {var}: NÃO CONFIGURADO")
-            missing.append(var)
-
-    if missing:
-        print(f"\n   ⚠️  FALTAM {len(missing)} variáveis obrigatórias!")
-        print(f"   Configure: {', '.join(missing)}")
-    else:
-        print("\n   ✅ Todas as variáveis configuradas!")
-
-else:
-    print("   ❌ Arquivo .env NÃO encontrado!")
-    print("   Execute: cp .env.example .env")
+if missing:
+    print(f"\n❌ INSTALE AS DEPENDÊNCIAS:")
+    print(f"   pip install {' '.join(missing)}")
     sys.exit(1)
 
-# 3. Check dependencies
-print("\n3️⃣  VERIFICANDO DEPENDÊNCIAS:")
-required_packages = [
-    'telegram',
-    'sqlalchemy',
-    'requests',
-    'dotenv',
-    'flask'
-]
+# 2. CARREGAR .ENV
+print("\n⚙️  Verificando .env...")
+from dotenv import load_dotenv
+load_dotenv()
 
-for package in required_packages:
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+
+if not TOKEN:
+    print("  ❌ TELEGRAM_BOT_TOKEN não encontrado no .env")
+    print("\n💡 Crie um arquivo .env com:")
+    print("   TELEGRAM_BOT_TOKEN=seu_token_aqui")
+    sys.exit(1)
+
+print(f"  ✅ Token encontrado: {TOKEN[:15]}...")
+
+# 3. TESTAR CONEXÃO COM TELEGRAM
+print("\n📡 Testando conexão com Telegram...")
+
+async def test_connection():
     try:
-        __import__(package.replace('-', '_'))
-        print(f"   ✅ {package}")
-    except ImportError:
-        print(f"   ❌ {package} não instalado")
-        print(f"      Execute: pip install -r requirements.txt")
+        from telegram import Bot
+        bot = Bot(token=TOKEN)
 
-# 4. Test Telegram Token
-print("\n4️⃣  TESTANDO TOKEN DO TELEGRAM:")
-try:
-    import requests
-    token = os.getenv('TELEGRAM_BOT_TOKEN')
-    if token:
-        response = requests.get(f"https://api.telegram.org/bot{token}/getMe", timeout=10)
-        if response.status_code == 200:
-            bot_info = response.json()
-            if bot_info.get('ok'):
-                bot_data = bot_info.get('result', {})
-                print(f"   ✅ Token válido!")
-                print(f"   Bot: @{bot_data.get('username', 'unknown')}")
-                print(f"   Nome: {bot_data.get('first_name', 'unknown')}")
-            else:
-                print(f"   ❌ Token inválido!")
+        # Testar getMe
+        me = await bot.get_me()
+        print(f"  ✅ Conectado ao bot: @{me.username}")
+        print(f"  📱 Nome: {me.first_name}")
+        print(f"  🆔 ID: {me.id}")
+        return True
+    except Exception as e:
+        print(f"  ❌ Erro na conexão: {e}")
+        return False
+
+# Executar teste
+resultado = asyncio.run(test_connection())
+
+if not resultado:
+    print("\n❌ NÃO CONSEGUIU CONECTAR AO TELEGRAM")
+    print("\n💡 Possíveis causas:")
+    print("   1. Token inválido ou expirado")
+    print("   2. Sem conexão com internet")
+    print("   3. Firewall bloqueando")
+    sys.exit(1)
+
+# 4. TESTAR DATABASE
+print("\n💾 Testando database...")
+
+async def test_database():
+    try:
+        import aiosqlite
+
+        # Criar database de teste
+        conn = await aiosqlite.connect(":memory:")
+
+        # Criar tabela
+        await conn.execute("""
+            CREATE TABLE test (
+                id INTEGER PRIMARY KEY,
+                value TEXT
+            )
+        """)
+
+        # Inserir dado
+        await conn.execute("INSERT INTO test (value) VALUES (?)", ("teste",))
+        await conn.commit()
+
+        # Ler dado
+        cursor = await conn.execute("SELECT value FROM test")
+        row = await cursor.fetchone()
+
+        await conn.close()
+
+        if row and row[0] == "teste":
+            print("  ✅ Database funcional")
+            return True
         else:
-            print(f"   ❌ Erro HTTP {response.status_code}")
+            print("  ❌ Erro ao ler do database")
+            return False
+
+    except Exception as e:
+        print(f"  ❌ Erro no database: {e}")
+        return False
+
+resultado_db = asyncio.run(test_database())
+
+if not resultado_db:
+    print("\n❌ PROBLEMA NO DATABASE")
+    sys.exit(1)
+
+# 5. VERIFICAR ARQUIVOS
+print("\n📂 Verificando arquivos necessários...")
+
+arquivos_necessarios = {
+    "bot.py": "ou bot_FIXED.py",
+    "config.py": "ou config_FIXED.py",
+    "database.py": "ou database_FIXED.py"
+}
+
+for arquivo, alternativa in arquivos_necessarios.items():
+    arquivo_fixed = arquivo.replace(".py", "_FIXED.py")
+
+    if os.path.exists(arquivo):
+        print(f"  ✅ {arquivo}")
+    elif os.path.exists(arquivo_fixed):
+        print(f"  ⚠️  {arquivo} não encontrado, mas {arquivo_fixed} existe")
+        print(f"     Execute: mv {arquivo_fixed} {arquivo}")
     else:
-        print("   ❌ TELEGRAM_BOT_TOKEN não configurado")
-except Exception as e:
-    print(f"   ❌ Erro ao testar token: {e}")
+        print(f"  ❌ {arquivo} NÃO ENCONTRADO")
 
-# 5. Test Database Connection
-print("\n5️⃣  TESTANDO CONEXÃO COM BANCO DE DADOS:")
-try:
-    from sqlalchemy import create_engine
-    db_url = os.getenv('DATABASE_URL')
-    if db_url:
-        engine = create_engine(db_url)
-        with engine.connect() as conn:
-            print(f"   ✅ Conexão com banco OK")
-            print(f"   URL: {db_url.split('@')[0]}@***")
-    else:
-        print("   ❌ DATABASE_URL não configurado")
-except Exception as e:
-    print(f"   ❌ Erro ao conectar: {e}")
-
-# 6. Test SMS-Activate API
-print("\n6️⃣  TESTANDO API SMS-ACTIVATE:")
-try:
-    api_key = os.getenv('SMS_ACTIVATE_API_KEY')
-    if api_key:
-        url = f"https://api.sms-activate.org/stubs/handler_api.php?api_key={api_key}&action=getBalance"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            result = response.text
-            if result.startswith('ACCESS_BALANCE:'):
-                balance = result.split(':')[1]
-                print(f"   ✅ API OK - Saldo: ${balance}")
-            else:
-                print(f"   ❌ Resposta inesperada: {result}")
-        else:
-            print(f"   ❌ Erro HTTP {response.status_code}")
-    else:
-        print("   ❌ SMS_ACTIVATE_API_KEY não configurado")
-except Exception as e:
-    print(f"   ❌ Erro ao testar API: {e}")
-
-# 7. Test Pluggy API
-print("\n7️⃣  TESTANDO API PLUGGY:")
-try:
-    client_id = os.getenv('PLUGGY_CLIENT_ID')
-    client_secret = os.getenv('PLUGGY_CLIENT_SECRET')
-
-    if client_id and client_secret:
-        env = os.getenv('PLUGGY_ENVIRONMENT', 'production')
-        base_url = 'https://api.pluggy.ai' if env == 'production' else 'https://api.sandbox.pluggy.ai'
-
-        response = requests.post(
-            f"{base_url}/auth",
-            json={"clientId": client_id, "clientSecret": client_secret},
-            timeout=10
-        )
-
-        if response.status_code == 200:
-            print(f"   ✅ Autenticação Pluggy OK")
-            print(f"   Ambiente: {env}")
-        else:
-            print(f"   ❌ Erro na autenticação: {response.status_code}")
-    else:
-        print("   ❌ Credenciais Pluggy não configuradas")
-except Exception as e:
-    print(f"   ❌ Erro ao testar Pluggy: {e}")
-
-print("\n" + "="*50)
-print("\n✅ DIAGNÓSTICO COMPLETO!")
-print("\nSe todos os itens estão OK, execute: python bot.py")
-print("Se houver erros, corrija as configurações acima.\n")
+print("\n" + "=" * 70)
+print("✅ DIAGNÓSTICO COMPLETO")
+print("\n💡 Se todos os testes passaram mas o bot não responde:")
+print("   1. O bot está rodando? Execute: python bot.py")
+print("   2. Você enviou /start no Telegram?")
+print("   3. Verifique os logs do bot")
