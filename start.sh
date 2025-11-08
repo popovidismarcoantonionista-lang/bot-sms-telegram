@@ -1,23 +1,15 @@
 #!/bin/bash
-# Start script for Railway deployment - OPTIMIZED
 
-echo "🚀 Starting Bot SMS Telegram..."
+echo "🚀 Iniciando Bot no Railway..."
 
-# Initialize database
-echo "📊 Initializing database..."
-python -c "from database import db; db.init_db()" || echo "⚠️  Database already initialized"
+# Verificar variáveis de ambiente
+if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+    echo "❌ ERRO: TELEGRAM_BOT_TOKEN não configurado!"
+    exit 1
+fi
 
-# Start worker in background (verifies deposits)
-echo "⚙️  Starting deposit worker..."
-python worker.py &
-WORKER_PID=$!
+echo "✅ Token encontrado"
+echo "✅ Iniciando bot..."
 
-# Wait a moment for worker to initialize
-sleep 2
-
-# Start bot
-echo "🤖 Starting Telegram bot..."
+# Executar bot
 python bot.py
-
-# If bot exits, kill worker
-kill $WORKER_PID 2>/dev/null
