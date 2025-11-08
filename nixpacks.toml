@@ -1,8 +1,11 @@
 [phases.setup]
-nixPkgs = ["python310", "postgresql"]
+nixPkgs = ["python310", "pip"]
 
 [phases.install]
 cmds = ["pip install -r requirements.txt"]
+
+[phases.build]
+cmds = ["python -m compileall ."]
 
 [start]
 cmd = "python bot.py"
